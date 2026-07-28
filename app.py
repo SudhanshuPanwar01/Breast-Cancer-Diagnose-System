@@ -1,155 +1,196 @@
-# app.py
-
 import os
-import joblib
-import traceback
-import numpy as np
 import gradio as gr
+import numpy as np
 import tensorflow as tf
+import joblib
 
-# ==========================================================
-# Load the Scaler and TensorFlow Model
-# ==========================================================
-try:
-    # --- CODE BLOCK: UPDATED FILENAME TO MATCH GITHUB REPO ---
-    # Changed from 'breast_cancer_scaler.pkl' to 'breast_cancer_model.pkl'
-    scaler = joblib.load('breast_cancer_model.pkl')
-    # ---------------------------------------------------------
-    deployed_nn = tf.keras.models.load_model('breast_cancer_model.h5')
-    print("Scaler and Deep Learning Model loaded successfully!")
-except Exception as e:
-    print(f"Warning: Files not found or error loading. {e}")
-    scaler = None
-    deployed_nn = None
+# =====================================================
+# Developed By : Parth
+# Roll No      : 241504
+# Course       : BCA - Data Science (3rd Year)
+# College      : Panipat Institute of Engineering & Technology, Samalkha
+# =====================================================
 
-# ==========================================================
-# Prediction Function with Bulletproof Error Handling
-# ==========================================================
-def predict_cancer(f1, f2, f3, f4, f5, f6, f7, f8, f9, f10):
-    
-    # 1. Capture the 10 user-provided Mean features from Sliders
-    user_mean_features = [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10]
+# Load Model
+model = tf.keras.models.load_model("breast_cancer_model.h5")
 
-    # 2. Hardcoded Error features
-    preassumed_error_features = [
-        0.2204,    # radius error mode
-        0.8561,    # texture error mode
-        1.778,     # perimeter error mode
-        16.64,     # area error mode
-        0.005080,  # smoothness error mode
-        0.01104,   # compactness error mode
-        0.0,       # concavity error mode
-        0.0,       # concave points error mode
-        0.01344,   # symmetry error mode
-        0.001784   # fractal dimension error mode
-    ]
+# Load Scaler
+scaler = joblib.load("breast_cancer_scaler.pkl")
 
-    # 3. Hardcoded Worst features using the actual dataset modes you provided
-    preassumed_worst_features = [
-        12.36,    # worst radius mode
-        17.70,    # worst texture mode 
-        101.7,    # worst perimeter mode 
-        284.4,    # worst area mode 
-        0.1216,   # worst smoothness mode
-        0.1486,   # worst compactness mode
-        0.0,      # worst concavity mode
-        0.0,      # worst concave points mode
-        0.2226,   # worst symmetry mode
-        0.07427   # worst fractal dimension mode
-    ]
+# -----------------------------------------------------
+# Feature Names
+# -----------------------------------------------------
 
-    # 4. Combine all arrays to perfectly match the 30 features the neural network expects
-    full_30_features = user_mean_features + preassumed_error_features + preassumed_worst_features
+feature_names = [
+    "Mean Radius",
+    "Mean Texture",
+    "Mean Perimeter",
+    "Mean Area",
+    "Mean Smoothness",
+    "Mean Compactness",
+    "Mean Concavity",
+    "Mean Concave Points",
+    "Mean Symmetry",
+    "Mean Fractal Dimension",
+    "Radius Error",
+    "Texture Error",
+    "Perimeter Error",
+    "Area Error",
+    "Smoothness Error",
+    "Compactness Error",
+    "Concavity Error",
+    "Concave Points Error",
+    "Symmetry Error",
+    "Fractal Dimension Error",
+    "Worst Radius",
+    "Worst Texture",
+    "Worst Perimeter",
+    "Worst Area",
+    "Worst Smoothness",
+    "Worst Compactness",
+    "Worst Concavity",
+    "Worst Concave Points",
+    "Worst Symmetry",
+    "Worst Fractal Dimension"
+]
 
-    # Model execution
-    if deployed_nn is None or scaler is None:
-        return "❌ Server Error: Model or Scaler failed to load. Check your repository files."
+# -----------------------------------------------------
+# Prediction Function
+# -----------------------------------------------------
 
-    try:
-        # Convert the full row of 30 features into a 2D NumPy array
-        input_array = np.array([full_30_features])
+def predict(*inputs):
 
-        # Apply scaling before prediction
-        scaled_input = scaler.transform(input_array)
+    data = np.array(inputs).reshape(1, -1)
 
-        # Get the prediction probability
-        prediction_prob = deployed_nn.predict(scaled_input)[0][0]
+    data = scaler.transform(data)
 
-        # Scikit-learn Breast Cancer target mapping: 0 = Malignant, 1 = Benign
-        if prediction_prob >= 0.5:
-            return (
-                f"🟢 Assessment Result (Confidence: {prediction_prob:.2%})\n\n"
-                "Classification: BENIGN\n\n"
-                "The cell characteristics suggest a non-cancerous tumor."
-            )
-        else:
-            malignant_confidence = 1 - prediction_prob
-            return (
-                f"🔴 Assessment Result (Confidence: {malignant_confidence:.2%})\n\n"
-                "Classification: MALIGNANT\n\n"
-                "The cell characteristics indicate a high risk of cancer. Please consult an oncologist immediately."
-            )
+    prediction = model.predict(data, verbose=0)
 
-    except Exception as e:
-        error_trace = traceback.format_exc()
-        print("RUNTIME ERROR:\n", error_trace)
-        return f"❌ Prediction failed due to an internal error.\n\nDEBUG INFO:\n{error_trace}"
+    probability = float(prediction[0][0])
 
-# ==========================================================
-# Interface Setup (Enhanced Slider Layout)
-# ==========================================================
-with gr.Blocks(theme=gr.themes.Soft(primary_hue="teal", neutral_hue="slate")) as app:
-    
-    gr.Markdown("<h1 style='text-align: center;'>🔬 Breast Cancer Detection System</h1>")
-    gr.Markdown("<p style='text-align: center;'>Adjust the basic medical metrics below. Advanced metrics are automatically calculated.</p>")
-    gr.Markdown("---")
+    if probability >= 0.5:
+        result = "🔴 Malignant (Cancer Detected)"
+        confidence = probability * 100
+        color = "#ff4d4d"
 
-    with gr.Row():
-        with gr.Column():
-            f1 = gr.Slider(minimum=0, maximum=40, step=0.1, value=14.0, label="Mean Radius")
-            f2 = gr.Slider(minimum=0, maximum=50, step=0.1, value=19.0, label="Mean Texture")
-            f3 = gr.Slider(minimum=0, maximum=200, step=1.0, value=90.0, label="Mean Perimeter")
-            f4 = gr.Slider(minimum=0, maximum=3000, step=10.0, value=650.0, label="Mean Area")
-            f5 = gr.Slider(minimum=0.0, maximum=0.2, step=0.001, value=0.09, label="Mean Smoothness")
-        
-        with gr.Column():
-            f6 = gr.Slider(minimum=0.0, maximum=0.5, step=0.001, value=0.1, label="Mean Compactness")
-            f7 = gr.Slider(minimum=0.0, maximum=0.5, step=0.001, value=0.08, label="Mean Concavity")
-            f8 = gr.Slider(minimum=0.0, maximum=0.25, step=0.001, value=0.04, label="Mean Concave Points")
-            f9 = gr.Slider(minimum=0.0, maximum=0.5, step=0.001, value=0.18, label="Mean Symmetry")
-            f10 = gr.Slider(minimum=0.0, maximum=0.15, step=0.001, value=0.06, label="Mean Fractal Dimension")
+    else:
+        result = "🟢 Benign (No Cancer Detected)"
+        confidence = (1 - probability) * 100
+        color = "#16a34a"
 
-    # Output Section
-    gr.Markdown("---")
-    with gr.Row():
-        submit_btn = gr.Button("Run Neural Network Analysis", variant="primary", size="lg")
-        clear_btn = gr.ClearButton(size="lg")
-    
-    with gr.Row():
-        result_box = gr.Textbox(label="Deep Learning Assessment Result", lines=5, interactive=False)
+    return f"""
+    <div style="
+    background:{color};
+    color:white;
+    padding:25px;
+    border-radius:15px;
+    text-align:center;
+    font-size:22px;
+    font-weight:bold;
+    box-shadow:0px 5px 20px rgba(0,0,0,0.3);
+    ">
 
-    # Footer
+    {result}
+
+    <br><br>
+
+    Confidence : {confidence:.2f}%
+
+    </div>
+    """
+
+# -----------------------------------------------------
+# Custom CSS
+# -----------------------------------------------------
+
+css = """
+
+.gradio-container{
+    max-width:1200px !important;
+}
+
+footer{
+display:none !important;
+}
+
+h1{
+text-align:center;
+}
+
+"""
+
+# -----------------------------------------------------
+# Build Interface
+# -----------------------------------------------------
+
+with gr.Blocks(css=css, theme=gr.themes.Soft()) as demo:
+
     gr.Markdown("""
-    ---
-    ### 👨‍💻 About the Developer
-    **Created by:** Chandan Saroj (MERN Stack Developer & SDE)
-    * **LinkedIn:** [Connect with me](YOUR_LINKEDIN_URL_HERE)
-    * **GitHub:** [Check out my projects](YOUR_GITHUB_URL_HERE)
-    """)
+# 🩺 Breast Cancer Prediction System
 
-    # Wire up the logic mapped only to the 10 visible sliders
-    input_components = [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10]
-    
-    submit_btn.click(fn=predict_cancer, inputs=input_components, outputs=result_box)
-    clear_btn.add(input_components + [result_box])
+### Deep Learning Based Breast Cancer Detection
 
-# ==========================================================
-# Launch Configuration
-# ==========================================================
+Enter all 30 medical measurements and click **Predict**.
+
+This system predicts whether the tumor is **Benign** or **Malignant**.
+""")
+
+    inputs = []
+
+    with gr.Row():
+
+        with gr.Column():
+
+            for feature in feature_names:
+                box = gr.Number(
+                    label=feature,
+                    value=0
+                )
+                inputs.append(box)
+
+        with gr.Column():
+
+            output = gr.HTML(label="Prediction")
+
+            predict_btn = gr.Button(
+                "🔍 Predict",
+                variant="primary",
+                size="lg"
+            )
+
+            clear_btn = gr.ClearButton(
+                components=inputs,
+                value="Clear"
+            )
+
+    predict_btn.click(
+        fn=predict,
+        inputs=inputs,
+        outputs=output
+    )
+
+    gr.Markdown("""
+
+---
+
+## 👨‍💻 Developed By
+
+### **Sudhanshu**
+
+**Roll No : 241533**
+
+**Course : BCA - Data Science (3rd Year)**
+
+**College : Panipat Institute of Engineering & Technology, Samalkha**
+
+---
+
+© 2026 Breast Cancer Prediction System
+
+""")
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    print(f"Starting Gradio server on 0.0.0.0:{port}...")
-    app.launch(
+    demo.launch(
         server_name="0.0.0.0",
-        server_port=port,
+        server_port=int(os.environ.get("PORT", 7860))
     )
